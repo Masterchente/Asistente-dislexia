@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+  --background: 210 100% 98%; /* gris muy claro */
+  --foreground: 220 15% 20%; /* gris oscuro, no negro puro */
+  --card: 210 100% 100%;
+  --card-foreground: 220 15% 20%;
+  --primary: 210 100% 48%; /* azul suave */
+  --primary-foreground: 0 0% 100%;
+  --muted: 210 60% 95%;
+  --muted-foreground: 210 10% 40%;
+  --accent: 180 60% 90%;
+  --accent-foreground: 210 20% 20%;
+  --ring: 210 100% 48%;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: 220 20% 12%; /* gris azulado oscuro */
+  --foreground: 220 10% 85%;
+  --card: 220 20% 16%;
+  --card-foreground: 220 10% 85%;
+  --primary: 210 100% 65%;
+  --primary-foreground: 220 20% 15%;
+  --muted: 220 10% 25%;
+  --muted-foreground: 220 10% 65%;
+  --accent: 180 40% 30%;
+  --accent-foreground: 220 10% 90%;
+  --ring: 210 100% 70%;
+}
+
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Definir clases para simular fuentes amigables para dislexia */
+  .font-dyslexic {
+    font-family: "Lexend", sans-serif;
+    letter-spacing: 0.05em;
+    line-height: 1.5;
+  }
+
+  /* Estilos para palabras difíciles y sílabas */
+  .palabra-dificil {
+    background-color: #ffecb3;
+    border-bottom: 1px dashed #ff9800;
+    cursor: help;
+  }
+
+  .palabra-sustituida {
+    background-color: #e3f2fd;
+    border-bottom: 1px solid #2196f3;
+    cursor: help;
+  }
+
+  .silaba-par {
+    color: inherit;
+  }
+
+  .silaba-impar {
+    color: #666666;
+  }
+
+  .idea-principal {
+    font-weight: bold;
+    color: #d32f2f;
+  }
+}
