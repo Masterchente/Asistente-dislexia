@@ -154,3 +154,29 @@ function contieneGrupoConsonanticoComplejo(palabra: string): boolean {
 function dividirEnSilabas(palabra: string): string[] {
   return hypher.hyphenate(palabra)
 }
+
+export function formatearTextoAutomaticamente(texto: string): string {
+  let resultado = texto
+
+  // Asegurar que los títulos vayan con doble salto de línea antes
+  resultado = resultado.replace(/(INSTITUTO POLITÉCNICO NACIONAL|ESCUELA SUPERIOR DE CÓMPUTO|INTRODUCCIÓN|CONCLUSIONES?|PROPÓSITO|RESULTADOS|ANÁLISIS|OBJETIVO|PROFESOR|ALUMNO|REPORTE|PARTE \d+|CONCLUSIÓN)/gi, "\n\n$1\n\n")
+
+  // Separar numeraciones como "1. Título"
+  resultado = resultado.replace(/(\n?)(\d+\.\s+)/g, "\n\n$2")
+
+  // Saltos de línea después de punto + mayúscula
+  resultado = resultado.replace(/([.?!])\s*(?=[A-ZÁÉÍÓÚÑ])/g, "$1\n")
+
+  // Agregar salto de línea antes de correos o URLs
+  resultado = resultado.replace(/(\S+@\S+\.\S+)/g, "\n$1\n")
+
+  // Saltos dobles para separar bloques repetidos
+  resultado = resultado.replace(/\n{2,}/g, "\n\n")
+
+  // Reemplazar más de dos espacios seguidos por uno solo
+  resultado = resultado.replace(/\s{2,}/g, " ")
+
+  // Eliminar espacios extra al inicio/final
+  return resultado.trim()
+}
+

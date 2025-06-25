@@ -35,9 +35,6 @@ export default function Home() {
                 <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl">
                       Facilitamos la lectura adaptando textos a las necesidades específicas de personas con dislexia.
                 </p>
-                <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl">
-                    Proyecto de Tecnología de Lenguaje Natural por Jimenez Hernandez Vicente David
-                </p>
               </div>
               <div className="space-x-4">
                 <Link href="/herramienta">

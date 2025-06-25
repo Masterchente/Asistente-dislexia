@@ -14,8 +14,30 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Switch } from "@/components/ui/switch"
 import TextStatistics from "@/components/text-statistics"
-import { procesarTextoParaDislexia } from "@/lib/text-processor"
+import { procesarTextoParaDislexia, formatearTextoAutomaticamente } from "@/lib/text-processor"
 import { generarPDF } from "@/lib/pdf-generator"
+import { useEffect } from "react"
+
+
+
+function getLuminance(hex: string): number {
+  const rgb = hex.replace("#", "").match(/.{2}/g)?.map((c) => parseInt(c, 16) / 255) || [0, 0, 0]
+  const a = rgb.map((c) =>
+    c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+  )
+  return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]
+}
+
+function getContrastRatio(hex1: string, hex2: string): number {
+  const lum1 = getLuminance(hex1)
+  const lum2 = getLuminance(hex2)
+  const brightest = Math.max(lum1, lum2)
+  const darkest = Math.min(lum1, lum2)
+  return (brightest + 0.05) / (darkest + 0.05)
+}
+
+
+
 
 export default function Herramienta() {
   const [inputText, setInputText] = useState("")
@@ -35,36 +57,75 @@ export default function Herramienta() {
   const [highlightMainIdeas, setHighlightMainIdeas] = useState(false)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  const [applyFormatting, setApplyFormatting] = useState(false)
+  const [lowContrastWarning, setLowContrastWarning] = useState(false)
+  const [satisfaccion, setSatisfaccion] = useState<number | null>(null)
+  const [comentario, setComentario] = useState("")
+  const [mostrarEvaluacion, setMostrarEvaluacion] = useState(false)
+
+
+
+
+useEffect(() => {
+  const contrast = getContrastRatio(textColor, backgroundColor) 
+  setLowContrastWarning(contrast < 4.5) // Nivel mínimo accesible recomendado
+}, [textColor, backgroundColor])
+
 
   const handleTextInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInputText(e.target.value)
-  }
+  const texto = e.target.value
+  setInputText(applyFormatting ? formatearTextoAutomaticamente(texto) : texto)
+}
 
-  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
 
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const text = event.target?.result as string
-      setInputText(text)
-    }
-    reader.readAsText(file)
+  const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0]
+  if (!file) return
+
+  const extension = file.name.split(".").pop()?.toLowerCase()
+
+  if (extension === "txt") {
+  const reader = new FileReader()
+  reader.onload = (event) => {
+    const text = event.target?.result as string
+    const textoFinal = applyFormatting ? formatearTextoAutomaticamente(text.trim()) : text.trim()
+    setInputText(textoFinal)
   }
+  reader.readAsText(file) // ← ESTO ES LO QUE FALTABA
+
+} else if (extension === "docx") {
+    const mammoth = await import("mammoth")
+    const arrayBuffer = await file.arrayBuffer()
+    const { value: html } = await mammoth.convertToHtml({ arrayBuffer })
+    const plainText = html.replace(/<[^>]+>/g, "") // quita etiquetas HTML
+    const textoFinal = applyFormatting ? formatearTextoAutomaticamente(plainText.trim()) : plainText.trim()
+    setInputText(textoFinal)
+
+
+  } else {
+    alert("Formato no soportado. Usa .txt o .docx")
+  }
+}
+
 
   const handleProcessText = () => {
-    if (!inputText.trim()) return
+  if (!inputText.trim()) return;
 
-    const processed = procesarTextoParaDislexia(inputText, {
-      resaltarSilabas: highlightSyllables,
-      resaltarPalabrasDificiles: highlightDifficultWords,
-      sustituirPalabrasDificiles: replaceDifficultWords,
-      resaltarIdeasPrincipales: highlightMainIdeas,
-    })
-    setProcessedText(processed)
-    setEditedText(processed)
-    setActiveTab("output")
-  }
+  const textoAUsar = applyFormatting ? formatearTextoAutomaticamente(inputText) : inputText;
+  const processed = procesarTextoParaDislexia(textoAUsar, {
+    resaltarSilabas: highlightSyllables,
+    resaltarPalabrasDificiles: highlightDifficultWords,
+    sustituirPalabrasDificiles: replaceDifficultWords,
+    resaltarIdeasPrincipales: highlightMainIdeas,
+  });
+
+  setProcessedText(processed);
+  setEditedText(processed);
+  setActiveTab("output");
+  setMostrarEvaluacion(true); // 👉 Muestra la evaluación al aplicar
+};
+
 
   const handleEditedTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setEditedText(e.target.value)
@@ -90,6 +151,20 @@ export default function Herramienta() {
       setIsGeneratingPDF(false)
     }
   }
+
+  const handleTextToSpeech = () => {
+    const textoPlano = editedText.replace(/<[^>]+>/g, "")
+    const utterance = new SpeechSynthesisUtterance(textoPlano)
+    utterance.lang = "es-ES"
+    utterance.rate = 1
+
+    setIsSpeaking(true)
+    utterance.onend = () => setIsSpeaking(false)
+
+    window.speechSynthesis.cancel()
+    window.speechSynthesis.speak(utterance)
+  }
+
 
   const textStyle = {
     fontFamily:
@@ -157,12 +232,12 @@ export default function Herramienta() {
                         Subir archivo
                       </Button>
                       <input
-                        type="file"
-                        accept=".txt"
-                        ref={fileInputRef}
-                        onChange={handleFileUpload}
-                        className="hidden"
-                      />
+                          type="file"
+                          accept=".txt,.pdf,.docx"
+                          ref={fileInputRef}
+                          onChange={handleFileUpload}
+                          className="hidden"
+                        />
                       <Button onClick={handleProcessText} disabled={!inputText.trim()}>
                         Procesar Texto
                       </Button>
@@ -187,9 +262,26 @@ export default function Herramienta() {
                       disabled={!editedText.trim() || isGeneratingPDF}
                       className="flex gap-2"
                     >
-                      <Download className="h-4 w-4" />
-                      {isGeneratingPDF ? "Generando..." : "Descargar PDF"}
+                     <Download className="h-4 w-4" />
+                    {isGeneratingPDF ? "Generando..." : "Descargar PDF"}
                     </Button>
+                    <Button
+                    variant="default"
+                  onClick={handleTextToSpeech}
+                  disabled={isSpeaking || !editedText.trim()}
+                  className="flex gap-2 ml-2"
+                  >
+                  🔊 {isSpeaking ? "Leyendo..." : "Leer en voz alta"}
+                  </Button>
+                  <Button
+                   variant="destructive"
+                  onClick={() => window.speechSynthesis.cancel()}
+                  disabled={!isSpeaking}
+                  className="flex gap-2"
+                >
+                  ✖️ Detener lectura
+                </Button>
+              
                   </CardHeader>
                   <CardContent>
                     <div
@@ -201,7 +293,7 @@ export default function Herramienta() {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="stats" className="space-y-4">
+              <TabsContent value="stats" className="space-y-4"> 
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -212,18 +304,58 @@ export default function Herramienta() {
                   </CardHeader>
                   <CardContent>
                   <TextStatistics
-  text={inputText}
-  adaptedText={processedText}
-/>
-
+                  text={inputText}
+                  adaptedText={processedText}
+                />
                   </CardContent>
                 </Card>
               </TabsContent>
             </Tabs>
-          </div>
 
+
+           {mostrarEvaluacion && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Evaluación de la Experiencia</CardTitle>
+                  <CardDescription>¿Te resultó útil la adaptación del texto?</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map((num) => (
+                      <Button
+                        key={num}
+                        variant={satisfaccion === num ? "default" : "outline"}
+                        onClick={() => setSatisfaccion(num)}
+                      >
+                        {num}
+                      </Button>
+                    ))}
+                  </div>
+                  <Textarea
+                    placeholder="¿Algo que quieras comentar?"
+                    value={comentario}
+                    onChange={(e) => setComentario(e.target.value)}
+                  />
+                  <Button
+                    onClick={() => {
+                      console.log("Calificación:", satisfaccion)
+                      console.log("Comentario:", comentario)
+                      alert("¡Gracias por tu opinión!")
+                      setSatisfaccion(null)
+                      setComentario("")
+                    }}
+                    disabled={satisfaccion === null}
+                  >
+                    Enviar Evaluación
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+
+          </div>
           <div className="space-y-6">
-            <Card>
+            <Card> 
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Settings2 className="h-5 w-5" />
@@ -333,6 +465,11 @@ export default function Herramienta() {
                         className="w-8 h-8 rounded cursor-pointer"
                       />
                       <span className="text-sm">{backgroundColor}</span>
+                      {lowContrastWarning && (
+                        <div className="text-sm text-red-600 font-semibold mt-2">
+                          ⚠️ La combinación de colores tiene poco contraste y puede dificultar la lectura.
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -369,6 +506,16 @@ export default function Herramienta() {
                 </div>
 
                 <div className="flex items-center space-x-2">
+                <Switch
+                  id="format-text-switch"
+                  checked={applyFormatting}
+                  onCheckedChange={setApplyFormatting}
+                />
+                <Label htmlFor="format-text-switch">Formatear texto automáticamente</Label> 
+              </div>
+
+
+                <div className="flex items-center space-x-2">
                   <Switch
                     id="replace-difficult-words"
                     checked={replaceDifficultWords}
@@ -396,6 +543,9 @@ export default function Herramienta() {
                 </Button>
               </CardContent>
             </Card>
+
+            
+
           </div>
         </div>
       </main>
@@ -421,13 +571,13 @@ export default function Herramienta() {
         }
         
         .silaba-par {
-          color: ${textColor};
+          color: #1f2937; /* gris muy oscuro */
+          font-weight: bold;
         }
-        
         .silaba-impar {
-          color: #666666;
+          color: #9ca3af; /* gris claro */
+          font-weight: bold;
         }
-        
         .idea-principal {
           font-weight: bold;
           color: #d32f2f;
